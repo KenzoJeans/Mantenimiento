@@ -6,15 +6,34 @@ st.set_page_config(page_title="Reporte de Mantenimiento", layout="wide")
 st.title("🔧 Reporte de Mantenimiento")
 st.markdown("---")
 
-# --- LISTAS DE DATOS (Listas preparadas para cuando envíes el inventario) ---
+# --- LISTAS DE DATOS ---
 mecanicos = ["Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
 tipos_intervencion_conf = ["Ajuste mecánico", "Instalación del folder", "Ajuste de tensión", "Cambio de elementos", "Programación de máquina"]
 
-# ESPERANDO TUS DATOS PARA LLENAR ESTAS LISTAS:
-maquinas_tintoreria = ["Lavadora", "Secadora", "Caldera", "Otro"] 
-maquinas_tiendas = ["Aire Acondicionado", "Iluminación", "Vitrina", "Otro"]
-maquinas_confeccion = ["Plana", "Fileteadora", "Recubridora", "Otro"]
-tiendas_kenzo = ["Tienda Centro", "Tienda Norte", "Tienda Sur"]
+maquinas_confeccion = [
+    "CADENETA", "FILETEADORA", "PLANA", "DOS AGUJAS", "COLLARIN PLANA", "COLLARIN CILINDRICA", 
+    "COLLARIN CODO", "EMPRETINADORA", "PRESILLADORA", "MAQUINA DE BOTAS", "MAQUINA DE J", 
+    "DIBUJADORA", "OJALADORA DE CAMISA", "OJALADORA DE LÁGRIMA", "PEGAR PASADORES", "HACER PASADORES", 
+    "RIBETEADORA", "FUSIONADORA", "VOLTEADORA DE PANTALÓN", "DOBLADILLADORA DE BOLSILLO", "CERRADORA", 
+    "CERRADORA DE CAMISA", "CERRADORA DE CODO", "CERRADORA DE PEDESTAL", "CORTADORA VERTICAL", 
+    "CORTADORA AUTOMÁTICA", "LÁSER", "BORDADORA", "TACHADORA", "PARCHADORA", "MULTIAGUJAS", 
+    "BOTONADORA", "REVISADORA DE TELAS", "MAQUINA FUSIONADORA"
+]
+
+maquinas_tintoreria = [
+    "LAVADORA", "SECADORA", "CENTÍFUGA", "LASER", "LAVADORA DE MUESTRAS", 
+    "SECADORA DE MUESTRAS", "CENTRÍFUGA DE MUESTRAS", "TERMOFIJADORA", 
+    "MOTORTOOL", "VARIBOOSTER", "PRENSA"
+]
+
+elementos_tintoreria = [
+    "CABLES", "MOTOR", "MULETILLAS", "RELÉS", "PULSADORES", "CONTACTORES", "TARJETAS", 
+    "PLC", "RESISTENCIAS", "CILINDROS", "VÁLVULAS", "ELECTROVÁLVULAS", "RODAMIENTOS", 
+    "EJES", "CHUMACERAS", "ENGRASES", "BOMBAS", "BOOSTER", "VÁLVULA MANUAL", "SERPENTINES", 
+    "PIÑONES", "TEMPORIZADOR", "POLEAS", "CORREA", "FUSIBLES", "AJUSTE DE BORNES", "RESORTES"
+]
+
+tiendas_kenzo = ["Tienda Centro", "Tienda Norte", "Tienda Sur"] # Pendiente tu listado real
 
 # Selector principal
 area = st.selectbox(
@@ -36,7 +55,8 @@ if area != "Seleccione un área...":
             with col2:
                 codigo_inv = st.text_input("4. Código de inventario").upper()
                 tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Predictivo"])
-                elementos = st.text_area("8. Elementos a intervenir")
+                # Cambiado a multiselect para permitir elegir varias piezas a la vez
+                elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria)
             
             observaciones = st.text_area("9. Observaciones del mantenimiento")
             colaborador = st.text_input("17. Colaborador que realizó el mantenimiento")
@@ -61,15 +81,12 @@ if area != "Seleccione un área...":
             with col1:
                 hora = st.time_input("2. Hora inicio mantenimiento", datetime.datetime.now().time())
                 codigo_inv = st.text_input("4. Código Inventario KPL").upper()
-                # Actualizado con Alistamiento y Adecuación
                 tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Alistamiento", "Adecuación"])
                 trabajo_realizado = st.text_area("8. Trabajo realizado")
-                # Lista de mecánicos actualizada
                 mecanico = st.selectbox("15. Mecánico", mecanicos)
             with col2:
                 num_modulo = st.text_input("3. Número de módulo")
                 tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion)
-                # Lista de intervención actualizada
                 intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf)
                 operario = st.text_input("16. Nombre Operario")
 
@@ -98,4 +115,3 @@ if area != "Seleccione un área...":
 
         if submit_btn:
             st.success("¡Datos listos para enviar!")
-            # Aquí irá la lógica del Webhook a Google Sheets
