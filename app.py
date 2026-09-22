@@ -33,7 +33,20 @@ elementos_tintoreria = [
     "PIÑONES", "TEMPORIZADOR", "POLEAS", "CORREA", "FUSIBLES", "AJUSTE DE BORNES", "RESORTES"
 ]
 
-tiendas_kenzo = ["Tienda Centro", "Tienda Norte", "Tienda Sur"] # Pendiente tu listado real
+tiendas_kenzo = [
+    "SALITRE PLAZA", "RESTREPO 1", "FONTIBON", "QUIRIGUA", "TUNAL", 
+    "PLAZA D LAS AMERICAS 1(Mujer)", "CENTRO SUBA", "SANTA HELENITA", "KENNEDY", 
+    "CHAPINERO", "ESTRADA", "CENTRO 1", "RESTREPO 2", "OUTLET ZONA", "PORTAL 80", 
+    "UNICENTRO OCCIDENTE", "YOPAL", "TINTAL PLAZA", "IMPERIAL", "SANTAFE", 
+    "CENTRO MAYOR", "TITAN PLAZA", "DIVER PLAZA", "ZIPAQUIRA", "MERCURIO", 
+    "FACTORY", "MOSQUERA", "HAYUELOS", "PLAZA D LAS AMERICAS 2 (Hombre)", 
+    "FUNZA MICENTRO", "GIRARDOT", "IPIALES", "CALLE 13 ZONA", "POPAYAN", 
+    "PLAZA CENTRAL", "BOSA PIAMONTE CALLE", "TOBERIN", "VENTURA TERREROS", 
+    "GRAN PLAZA ENSUEÑO", "CAJICA", "TUNJA", "GRAN PLAZA BOSA", "PASEO VILLA DEL RIO", 
+    "NUESTRO BOGOTA", "ATREVETE FONTIBON", "ATREVETE SEVILLANA", "MADRID", 
+    "CARRERA 62", "OUTLET CENTER", "FUSAGASUGA", "ALTA VISTA", "OUTLET CARRERA 62", 
+    "RIO NEGRO - ANTIOQUIA", "OUTLET FLORESTA", "ESPINAL", "FUNZA CENTRO"
+]
 
 # Selector principal
 area = st.selectbox(
@@ -55,7 +68,6 @@ if area != "Seleccione un área...":
             with col2:
                 codigo_inv = st.text_input("4. Código de inventario").upper()
                 tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Predictivo"])
-                # Cambiado a multiselect para permitir elegir varias piezas a la vez
                 elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria)
             
             observaciones = st.text_area("9. Observaciones del mantenimiento")
