@@ -7,7 +7,8 @@ st.set_page_config(page_title="Reporte de Mantenimiento", layout="wide")
 # Conexión con Google Sheets mediante gspread
 @st.cache_resource
 def get_gsheet_client():
-    return gspread.service_account(filename="credentials.json")
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    return gspread.service_account_from_dict(creds_dict)
 
 # ID de tu hoja de Google Sheets
 SPREADSHEET_ID = "1eyXRRNUGEMbWTdNW-hpFraoSCvn-A_LzscTwLrVfAvg"
