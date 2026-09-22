@@ -1,10 +1,13 @@
 import streamlit as st
 import datetime
+from zoneinfo import ZoneInfo
 import gspread
 
 st.set_page_config(page_title="Reporte de Mantenimiento", layout="wide")
 
-# Conexión con Google Sheets mediante gspread
+TZ_BOGOTA = ZoneInfo("America/Bogota")
+
+# Conexión con Google Sheets mediante gspread + st.secrets
 @st.cache_resource
 def get_gsheet_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -14,62 +17,68 @@ def get_gsheet_client():
 SPREADSHEET_ID = "1eyXRRNUGEMbWTdNW-hpFraoSCvn-A_LzscTwLrVfAvg"
 
 st.title("🔧 Reporte de Mantenimiento - Kenzo Jeans")
+st.caption("Completa todos los campos marcados y guarda el reporte antes de cambiar de área.")
 st.markdown("---")
 
 # --- LISTAS DE DATOS ---
-mecanicos = ["Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
+PLACEHOLDER = "Seleccione..."
+
+mecanicos = [PLACEHOLDER, "Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
 tipos_intervencion_conf = [
-    "Ajuste mecánico", "Instalación del folder", "Ajuste de tensión", 
+    PLACEHOLDER, "Ajuste mecánico", "Instalación del folder", "Ajuste de tensión",
     "Cambio de elementos", "Programación de máquina"
 ]
+tipos_mantenimiento_general = [PLACEHOLDER, "Preventivo", "Correctivo", "Predictivo"]
+tipos_mantenimiento_tiendas = [PLACEHOLDER, "Preventivo", "Correctivo", "Locativo"]
+tipos_mantenimiento_confeccion = [PLACEHOLDER, "Preventivo", "Correctivo", "Alistamiento", "Adecuación"]
 
-maquinas_confeccion = [
-    "CADENETA", "FILETEADORA", "PLANA", "DOS AGUJAS", "COLLARIN PLANA", "COLLARIN CILINDRICA", 
-    "COLLARIN CODO", "EMPRETINADORA", "PRESILLADORA", "MAQUINA DE BOTAS", "MAQUINA DE J", 
-    "DIBUJADORA", "OJALADORA DE CAMISA", "OJALADORA DE LÁGRIMA", "PEGAR PASADORES", "HACER PASADORES", 
-    "RIBETEADORA", "FUSIONADORA", "VOLTEADORA DE PANTALÓN", "DOBLADILLADORA DE BOLSILLO", "CERRADORA", 
-    "CERRADORA DE CAMISA", "CERRADORA DE CODO", "CERRADORA DE PEDESTAL", "CORTADORA VERTICAL", 
-    "CORTADORA AUTOMÁTICA", "LÁSER", "BORDADORA", "TACHADORA", "PARCHADORA", "MULTIAGUJAS", 
+maquinas_confeccion = [PLACEHOLDER] + [
+    "CADENETA", "FILETEADORA", "PLANA", "DOS AGUJAS", "COLLARIN PLANA", "COLLARIN CILINDRICA",
+    "COLLARIN CODO", "EMPRETINADORA", "PRESILLADORA", "MAQUINA DE BOTAS", "MAQUINA DE J",
+    "DIBUJADORA", "OJALADORA DE CAMISA", "OJALADORA DE LÁGRIMA", "PEGAR PASADORES", "HACER PASADORES",
+    "RIBETEADORA", "FUSIONADORA", "VOLTEADORA DE PANTALÓN", "DOBLADILLADORA DE BOLSILLO", "CERRADORA",
+    "CERRADORA DE CAMISA", "CERRADORA DE CODO", "CERRADORA DE PEDESTAL", "CORTADORA VERTICAL",
+    "CORTADORA AUTOMÁTICA", "LÁSER", "BORDADORA", "TACHADORA", "PARCHADORA", "MULTIAGUJAS",
     "BOTONADORA", "REVISADORA DE TELAS", "MAQUINA FUSIONADORA"
 ]
 
-maquinas_tintoreria = [
-    "LAVADORA", "SECADORA", "CENTÍFUGA", "LASER", "LAVADORA DE MUESTRAS", 
-    "SECADORA DE MUESTRAS", "CENTRÍFUGA DE MUESTRAS", "TERMOFIJADORA", 
+maquinas_tintoreria = [PLACEHOLDER] + [
+    "LAVADORA", "SECADORA", "CENTÍFUGA", "LASER", "LAVADORA DE MUESTRAS",
+    "SECADORA DE MUESTRAS", "CENTRÍFUGA DE MUESTRAS", "TERMOFIJADORA",
     "MOTORTOOL", "VARIBOOSTER", "PRENSA"
 ]
 
 elementos_tintoreria = [
-    "CABLES", "MOTOR", "MULETILLAS", "RELÉS", "PULSADORES", "CONTACTORES", "TARJETAS", 
-    "PLC", "RESISTENCIAS", "CILINDROS", "VÁLVULAS", "ELECTROVÁLVULAS", "RODAMIENTOS", 
-    "EJES", "CHUMACERAS", "ENGRASES", "BOMBAS", "BOOSTER", "VÁLVULA MANUAL", "SERPENTINES", 
+    "CABLES", "MOTOR", "MULETILLAS", "RELÉS", "PULSADORES", "CONTACTORES", "TARJETAS",
+    "PLC", "RESISTENCIAS", "CILINDROS", "VÁLVULAS", "ELECTROVÁLVULAS", "RODAMIENTOS",
+    "EJES", "CHUMACERAS", "ENGRASES", "BOMBAS", "BOOSTER", "VÁLVULA MANUAL", "SERPENTINES",
     "PIÑONES", "TEMPORIZADOR", "POLEAS", "CORREA", "FUSIBLES", "AJUSTE DE BORNES", "RESORTES"
 ]
 
-tiendas_kenzo = [
-    "SALITRE PLAZA", "RESTREPO 1", "FONTIBON", "QUIRIGUA", "TUNAL", 
-    "PLAZA D LAS AMERICAS 1(Mujer)", "CENTRO SUBA", "SANTA HELENITA", "KENNEDY", 
-    "CHAPINERO", "ESTRADA", "CENTRO 1", "RESTREPO 2", "OUTLET ZONA", "PORTAL 80", 
-    "UNICENTRO OCCIDENTE", "YOPAL", "TINTAL PLAZA", "IMPERIAL", "SANTAFE", 
-    "CENTRO MAYOR", "TITAN PLAZA", "DIVER PLAZA", "ZIPAQUIRA", "MERCURIO", 
-    "FACTORY", "MOSQUERA", "HAYUELOS", "PLAZA D LAS AMERICAS 2 (Hombre)", 
-    "FUNZA MICENTRO", "GIRARDOT", "IPIALES", "CALLE 13 ZONA", "POPAYAN", 
-    "PLAZA CENTRAL", "BOSA PIAMONTE CALLE", "TOBERIN", "VENTURA TERREROS", 
-    "GRAN PLAZA ENSUEÑO", "CAJICA", "TUNJA", "GRAN PLAZA BOSA", "PASEO VILLA DEL RIO", 
-    "NUESTRO BOGOTA", "ATREVETE FONTIBON", "ATREVETE SEVILLANA", "MADRID", 
-    "CARRERA 62", "OUTLET CENTER", "FUSAGASUGA", "ALTA VISTA", "OUTLET CARRERA 62", 
+tiendas_kenzo = [PLACEHOLDER] + [
+    "SALITRE PLAZA", "RESTREPO 1", "FONTIBON", "QUIRIGUA", "TUNAL",
+    "PLAZA D LAS AMERICAS 1(Mujer)", "CENTRO SUBA", "SANTA HELENITA", "KENNEDY",
+    "CHAPINERO", "ESTRADA", "CENTRO 1", "RESTREPO 2", "OUTLET ZONA", "PORTAL 80",
+    "UNICENTRO OCCIDENTE", "YOPAL", "TINTAL PLAZA", "IMPERIAL", "SANTAFE",
+    "CENTRO MAYOR", "TITAN PLAZA", "DIVER PLAZA", "ZIPAQUIRA", "MERCURIO",
+    "FACTORY", "MOSQUERA", "HAYUELOS", "PLAZA D LAS AMERICAS 2 (Hombre)",
+    "FUNZA MICENTRO", "GIRARDOT", "IPIALES", "CALLE 13 ZONA", "POPAYAN",
+    "PLAZA CENTRAL", "BOSA PIAMONTE CALLE", "TOBERIN", "VENTURA TERREROS",
+    "GRAN PLAZA ENSUEÑO", "CAJICA", "TUNJA", "GRAN PLAZA BOSA", "PASEO VILLA DEL RIO",
+    "NUESTRO BOGOTA", "ATREVETE FONTIBON", "ATREVETE SEVILLANA", "MADRID",
+    "CARRERA 62", "OUTLET CENTER", "FUSAGASUGA", "ALTA VISTA", "OUTLET CARRERA 62",
     "RIO NEGRO - ANTIOQUIA", "OUTLET FLORESTA", "ESPINAL", "FUNZA CENTRO"
 ]
 
 area = st.selectbox(
-    "1. ÁREA A LA QUE VA A REALIZAR EL MANTENIMIENTO", 
+    "1. ÁREA A LA QUE VA A REALIZAR EL MANTENIMIENTO",
     ["Seleccione un área...", "Tintorería / Planta", "Tiendas", "Confección"]
 )
 
 if area != "Seleccione un área...":
-    with st.form(key=f"form_mantenimiento_{area}"):
-        
-        # Variable inicializadoras
+    with st.form(key=f"form_mantenimiento_{area}", clear_on_submit=True):
+
+        # Variables inicializadoras
         num_maquina = ""
         codigo_inv = ""
         tipo_maquina = ""
@@ -81,21 +90,23 @@ if area != "Seleccione un área...":
         tienda = ""
         num_modulo = ""
         trabajo_realizado = ""
-        
+
+        hora_default = datetime.datetime.now(TZ_BOGOTA).time()
+
         # --- SECCIÓN: TINTORERÍA / PLANTA ---
         if area == "Tintorería / Planta":
             col1, col2 = st.columns(2)
             with col1:
-                hora = st.time_input("2. Hora de mantenimiento", datetime.datetime.now().time())
+                hora = st.time_input("2. Hora de mantenimiento", hora_default)
                 num_maquina = st.text_input("3. Número de máquina (KPL)")
                 tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_tintoreria)
                 tipo_intervencion = st.text_input("7. Tipo de intervención")
             with col2:
                 codigo_inv = st.text_input("4. Código de inventario").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Predictivo"])
+                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_general)
                 elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria)
                 elementos_str = ", ".join(elementos)
-            
+
             observaciones = st.text_area("9. Observaciones del mantenimiento")
             colaborador = st.text_input("17. Colaborador que realizó el mantenimiento")
 
@@ -103,23 +114,23 @@ if area != "Seleccione un área...":
         elif area == "Tiendas":
             col1, col2 = st.columns(2)
             with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", datetime.datetime.now().time())
-                tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Locativo"])
+                hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
+                tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", tipos_mantenimiento_tiendas)
                 elementos_str = st.text_area("6. Elementos a intervenir")
             with col2:
-                tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo) 
+                tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo)
                 tipo_intervencion = st.text_input("5. Tipo de intervención")
                 colaborador = st.text_input("12. Operario que realizó el mantenimiento")
-            
+
             observaciones = st.text_area("7. Observaciones del mantenimiento")
 
         # --- SECCIÓN: CONFECCIÓN ---
         elif area == "Confección":
             col1, col2 = st.columns(2)
             with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", datetime.datetime.now().time())
+                hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
                 codigo_inv = st.text_input("4. Código Inventario KPL").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", ["Preventivo", "Correctivo", "Alistamiento", "Adecuación"])
+                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_confeccion)
                 trabajo_realizado = st.text_area("8. Trabajo realizado")
                 mecanico = st.selectbox("15. Mecánico", mecanicos)
             with col2:
@@ -131,11 +142,11 @@ if area != "Seleccione un área...":
 
         st.markdown("### ⚙️ Repuestos y Residuos")
         col_rep, col_res = st.columns(2)
-        
+
         req_repuestos = "No"
         tipo_repuesto = ""
         costo_repuesto = 0.0
-        
+
         with col_rep:
             if area in ["Tintorería / Planta", "Confección"]:
                 req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"])
@@ -147,7 +158,7 @@ if area != "Seleccione un área...":
         tipo_residuo = ""
         desc_residuo = ""
         disposicion = ""
-        
+
         with col_res:
             gen_residuos = st.radio("¿Generó residuos?", ["No", "Sí"])
             if gen_residuos == "Sí":
@@ -159,43 +170,58 @@ if area != "Seleccione un área...":
         submit_btn = st.form_submit_button("Guardar Reporte", type="primary")
 
         if submit_btn:
-            try:
-                # 1. Autenticar con Google Sheets
-                gc = get_gsheet_client()
-                sh = gc.open_by_key(SPREADSHEET_ID)
-                worksheet = sh.worksheet("DATOS GENERALES")
-                
-                # 2. Generar Timestamp
-                marca_temporal = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                # 3. Construir la fila mapeando exactamente a las 21 columnas
-                row_data = [
-                    marca_temporal,
-                    area,
-                    str(hora),
-                    num_maquina,
-                    codigo_inv,
-                    tipo_maquina,
-                    tipo_mantenimiento,
-                    tipo_intervencion,
-                    elementos_str,
-                    observaciones,
-                    colaborador,
-                    tienda,
-                    num_modulo,
-                    trabajo_realizado,
-                    req_repuestos,
-                    tipo_repuesto,
-                    costo_repuesto if req_repuestos == "Sí" else 0,
-                    gen_residuos,
-                    tipo_residuo,
-                    desc_residuo,
-                    disposicion
-                ]
-                
-                # 4. Insertar fila en Google Sheets
-                worksheet.append_row(row_data)
-                st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
-                
-            except Exception as e:
-                st.error(f"❌ Error al conectar o guardar en Google Sheets: {e}")
+            # --- VALIDACIÓN DE CAMPOS OBLIGATORIOS ANTES DE GUARDAR ---
+            errores = []
+            if tipo_maquina in ("", PLACEHOLDER) and area in ["Tintorería / Planta", "Confección"]:
+                errores.append("Selecciona el tipo de máquina.")
+            if tipo_mantenimiento in ("", PLACEHOLDER):
+                errores.append("Selecciona el tipo de mantenimiento.")
+            if area == "Confección" and (colaborador in ("", PLACEHOLDER) or colaborador.startswith(PLACEHOLDER)):
+                errores.append("Selecciona el mecánico.")
+            if area == "Tiendas" and tienda in ("", PLACEHOLDER):
+                errores.append("Selecciona la tienda.")
+
+            if errores:
+                for e in errores:
+                    st.warning(f"⚠️ {e}")
+            else:
+                try:
+                    # 1. Autenticar con Google Sheets
+                    gc = get_gsheet_client()
+                    sh = gc.open_by_key(SPREADSHEET_ID)
+                    worksheet = sh.worksheet("DATOS GENERALES")
+
+                    # 2. Generar Timestamp en hora de Bogotá
+                    marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%Y-%m-%d %H:%M:%S")
+
+                    # 3. Construir la fila mapeando exactamente a las 21 columnas
+                    row_data = [
+                        marca_temporal,
+                        area,
+                        str(hora),
+                        num_maquina,
+                        codigo_inv,
+                        tipo_maquina,
+                        tipo_mantenimiento,
+                        tipo_intervencion,
+                        elementos_str,
+                        observaciones,
+                        colaborador,
+                        tienda,
+                        num_modulo,
+                        trabajo_realizado,
+                        req_repuestos,
+                        tipo_repuesto,
+                        costo_repuesto if req_repuestos == "Sí" else 0,
+                        gen_residuos,
+                        tipo_residuo,
+                        desc_residuo,
+                        disposicion
+                    ]
+
+                    # 4. Insertar fila en Google Sheets
+                    worksheet.append_row(row_data)
+                    st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
+
+                except Exception as e:
+                    st.error(f"❌ Error al conectar o guardar en Google Sheets: {e}")
