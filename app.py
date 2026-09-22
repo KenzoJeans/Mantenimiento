@@ -219,8 +219,16 @@ if area != "Seleccione un área...":
                         disposicion
                     ]
 
-                    # 4. Insertar fila en Google Sheets
-                    worksheet.append_row(row_data)
+                    # 4. Insertar fila en Google Sheets, forzando el rango exacto A:U
+                    # (evita que Sheets "adivine" mal la tabla si hay otras tablas/objetos
+                    # más a la derecha en la misma pestaña, como la del formulario viejo)
+                    col_a_values = worksheet.col_values(1)  # valores actuales de la columna A
+                    siguiente_fila = len(col_a_values) + 1
+                    worksheet.update(
+                        f"A{siguiente_fila}:U{siguiente_fila}",
+                        [row_data],
+                        value_input_option="USER_ENTERED"
+                    )
                     st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
 
                 except Exception as e:
