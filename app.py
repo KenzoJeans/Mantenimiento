@@ -33,9 +33,9 @@ def get_gsheet_client():
 SPREADSHEET_ID = "1eyXRRNUGEMbWTdNW-hpFraoSCvn-A_LzscTwLrVfAvg"
 
 # Nombres exactos de las pestañas nuevas (deben existir ya en tu Google Sheet)
-HOJA_PLANTA = "Planta"
+HOJA_TINTORERIA = "Tintorería"
 HOJA_TIENDAS = "Tiendas"
-HOJA_CONFECCION = "Confección"
+HOJA_PLANTA = "Planta"
 
 
 def guardar_en_hoja(nombre_hoja: str, row_data: list):
@@ -119,7 +119,7 @@ tiendas_kenzo = [PLACEHOLDER] + [
 
 area = st.selectbox(
     "1. ÁREA A LA QUE VA A REALIZAR EL MANTENIMIENTO",
-    ["Seleccione un área...", "Tintorería / Planta", "Tiendas", "Confección"]
+    ["Seleccione un área...", "Tintorería", "Tiendas", "Planta/Confección"]
 )
 
 if area != "Seleccione un área...":
@@ -128,7 +128,7 @@ if area != "Seleccione un área...":
         hora_default = datetime.datetime.now(TZ_BOGOTA).time()
 
         # --- SECCIÓN: TINTORERÍA / PLANTA ---
-        if area == "Tintorería / Planta":
+        if area == "Tintorería":
             col1, col2 = st.columns(2)
             with col1:
                 hora = st.time_input("2. Hora de mantenimiento", hora_default)
@@ -159,7 +159,7 @@ if area != "Seleccione un área...":
             observaciones = st.text_area("7. Observaciones del mantenimiento")
 
         # --- SECCIÓN: CONFECCIÓN ---
-        elif area == "Confección":
+        elif area == "Planta/Confección":
             col1, col2 = st.columns(2)
             with col1:
                 hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
@@ -181,7 +181,7 @@ if area != "Seleccione un área...":
         costo_repuesto = 0.0
 
         with col_rep:
-            if area in ["Tintorería / Planta", "Confección"]:
+            if area in ["Tintorería", "Planta/Confección"]:
                 req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"])
                 if req_repuestos == "Sí":
                     tipo_repuesto = st.text_input("Tipo de repuesto")
