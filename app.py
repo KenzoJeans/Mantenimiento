@@ -114,6 +114,28 @@ area = st.selectbox(
 )
 
 if area != "Seleccione un área...":
+
+    # --- 1. Preguntas interactivas FUERA del st.form ---
+    st.markdown("### ⚙️ Repuestos y Residuos")
+    col_rep_top, col_res_top = st.columns(2)
+
+    req_repuestos = "No"
+    with col_rep_top:
+        if area in ["Tintorería", "Planta/Confección"]:
+            req_repuestos = st.radio(
+                "¿Se requieren repuestos?", 
+                ["No", "Sí"], 
+                key=f"radio_rep_{area}"
+            )
+
+    with col_res_top:
+        gen_residuos = st.radio(
+            "¿Generó residuos?", 
+            ["No", "Sí"], 
+            key=f"radio_res_{area}"
+        )
+
+    # --- 2. Formulario principal ---
     with st.form(key=f"form_mantenimiento_{area}", clear_on_submit=True):
 
         hora_default = datetime.datetime.now(TZ_BOGOTA).time()
@@ -161,34 +183,34 @@ if area != "Seleccione un área...":
                 tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf)
                 operario_conf = st.text_input("16. Nombre Operario")
 
-        st.markdown("### ⚙️ Repuestos y Residuos")
-        col_rep, col_res = st.columns(2)
-
-        req_repuestos = "No"
+        # --- 3. Campos condicionales DENTRO del form (se activan según los radio anteriores) ---
         tipo_repuesto = ""
         costo_repuesto = 0.0
+        if req_repuestos == "Sí":
+            st.markdown("#### Detalle de Repuestos")
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                tipo_repuesto = st.text_input("Tipo de repuesto")
+            with col_r2:
+                costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0)
 
-        with col_rep:
-            if area in ["Tintorería", "Planta/Confección"]:
-                req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"])
-                if req_repuestos == "Sí":
-                    tipo_repuesto = st.text_input("Tipo de repuesto")
-                    costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0)
-
-        gen_residuos = "No"
         tipo_residuo = ""
         desc_residuo = ""
         disposicion = ""
-
-        with col_res:
-            gen_residuos = st.radio("¿Generó residuos?", ["No", "Sí"])
-            if gen_residuos == "Sí":
+        if gen_residuos == "Sí":
+            st.markdown("#### Detalle de Residuos")
+            col_w1, col_w2, col_w3 = st.columns(3)
+            with col_w1:
                 tipo_residuo = st.selectbox("Tipo de residuo", ["Aprovechable", "No Aprovechable", "Peligroso / Químico", "Especial"])
+            with col_w2:
                 desc_residuo = st.text_input("Descripción del residuo")
+            with col_w3:
                 disposicion = st.text_input("Disposición final")
 
         st.markdown("---")
         submit_btn = st.form_submit_button("Guardar Reporte", type="primary")
+
+        # (Mantener la lógica de guardado y validaciones de submit_btn exactamente igual)
 
         if submit_btn:
             errores = []
