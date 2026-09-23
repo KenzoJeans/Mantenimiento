@@ -207,7 +207,7 @@ if area != "Seleccione un área...":
                 for e in errores:
                     st.warning(f"⚠️ {e}")
             else:
-                marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%Y-%m-%d %H:%M:%S")
+                marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%d/%m/%Y %H:%M:%S")
                 try:
                     if area == "Tintorería":
                         row_data = [
