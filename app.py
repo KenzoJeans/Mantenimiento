@@ -2,27 +2,74 @@ import streamlit as st
 import datetime
 from zoneinfo import ZoneInfo
 import gspread
+import os
 
-st.set_page_config(page_title="Reporte de Mantenimiento", layout="wide")
+st.set_page_config(page_title="Reporte de Mantenimiento - Kenzo Jeans", page_icon="🔧", layout="wide")
 
 TZ_BOGOTA = ZoneInfo("America/Bogota")
+PLACEHOLDER = "Seleccione..."
 
-# Conexión con Google Sheets mediante gspread + st.secrets
+# Nombre del archivo del logo. Súbelo al repositorio (junto a este app.py) con este nombre exacto,
+# o cambia la ruta aquí si lo guardas en una subcarpeta (ej. "assets/logo.png").
+LOGO_PATH = "logo.png"
+
+
+def col_letter(n: int) -> str:
+    """Convierte un número de columna (1, 2, 3...) a su letra de Google Sheets (A, B, C...)."""
+    letra = ""
+    while n > 0:
+        n, resto = divmod(n - 1, 26)
+        letra = chr(65 + resto) + letra
+    return letra
+
+
+# --- Conexión con Google Sheets mediante gspread + st.secrets ---
 @st.cache_resource
 def get_gsheet_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
     return gspread.service_account_from_dict(creds_dict)
 
-# ID de tu hoja de Google Sheets
+
 SPREADSHEET_ID = "1eyXRRNUGEMbWTdNW-hpFraoSCvn-A_LzscTwLrVfAvg"
 
-st.title("🔧 Reporte de Mantenimiento - Kenzo Jeans")
-st.caption("Completa todos los campos marcados y guarda el reporte antes de cambiar de área.")
+# Nombres exactos de las pestañas nuevas (deben existir ya en tu Google Sheet)
+HOJA_PLANTA = "Planta"
+HOJA_TIENDAS = "Tiendas"
+HOJA_CONFECCION = "Confección"
+
+
+def guardar_en_hoja(nombre_hoja: str, row_data: list):
+    """Calcula la siguiente fila vacía (según columna A) y escribe con rango explícito,
+    evitando que Sheets 'adivine' mal la tabla si hay otros objetos en la pestaña."""
+    gc = get_gsheet_client()
+    sh = gc.open_by_key(SPREADSHEET_ID)
+    worksheet = sh.worksheet(nombre_hoja)
+
+    col_a_values = worksheet.col_values(1)
+    siguiente_fila = len(col_a_values) + 1
+    ultima_col = col_letter(len(row_data))
+
+    worksheet.update(
+        f"A{siguiente_fila}:{ultima_col}{siguiente_fila}",
+        [row_data],
+        value_input_option="USER_ENTERED"
+    )
+
+
+# --- ENCABEZADO CON LOGO ---
+col_logo, col_titulo = st.columns([1, 5])
+with col_logo:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=110)
+    else:
+        st.write("")  # deja el espacio reservado aunque el logo aún no esté subido
+with col_titulo:
+    st.title("🔧 Reporte de Mantenimiento - Kenzo Jeans")
+    st.caption("Completa todos los campos marcados y guarda el reporte antes de cambiar de área.")
+
 st.markdown("---")
 
 # --- LISTAS DE DATOS ---
-PLACEHOLDER = "Seleccione..."
-
 mecanicos = [PLACEHOLDER, "Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
 tipos_intervencion_conf = [
     PLACEHOLDER, "Ajuste mecánico", "Instalación del folder", "Ajuste de tensión",
@@ -78,19 +125,6 @@ area = st.selectbox(
 if area != "Seleccione un área...":
     with st.form(key=f"form_mantenimiento_{area}", clear_on_submit=True):
 
-        # Variables inicializadoras
-        num_maquina = ""
-        codigo_inv = ""
-        tipo_maquina = ""
-        tipo_mantenimiento = ""
-        tipo_intervencion = ""
-        elementos_str = ""
-        observaciones = ""
-        colaborador = ""
-        tienda = ""
-        num_modulo = ""
-        trabajo_realizado = ""
-
         hora_default = datetime.datetime.now(TZ_BOGOTA).time()
 
         # --- SECCIÓN: TINTORERÍA / PLANTA ---
@@ -138,7 +172,6 @@ if area != "Seleccione un área...":
                 tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion)
                 tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf)
                 operario_conf = st.text_input("16. Nombre Operario")
-                colaborador = f"{mecanico} (Operario: {operario_conf})" if operario_conf else mecanico
 
         st.markdown("### ⚙️ Repuestos y Residuos")
         col_rep, col_res = st.columns(2)
@@ -170,65 +203,53 @@ if area != "Seleccione un área...":
         submit_btn = st.form_submit_button("Guardar Reporte", type="primary")
 
         if submit_btn:
-            # --- VALIDACIÓN DE CAMPOS OBLIGATORIOS ANTES DE GUARDAR ---
+            # --- VALIDACIÓN DE CAMPOS OBLIGATORIOS ---
             errores = []
-            if tipo_maquina in ("", PLACEHOLDER) and area in ["Tintorería / Planta", "Confección"]:
+            if area in ["Tintorería / Planta", "Confección"] and tipo_maquina == PLACEHOLDER:
                 errores.append("Selecciona el tipo de máquina.")
-            if tipo_mantenimiento in ("", PLACEHOLDER):
+            if tipo_mantenimiento == PLACEHOLDER:
                 errores.append("Selecciona el tipo de mantenimiento.")
-            if area == "Confección" and (colaborador in ("", PLACEHOLDER) or colaborador.startswith(PLACEHOLDER)):
+            if area == "Confección" and mecanico == PLACEHOLDER:
                 errores.append("Selecciona el mecánico.")
-            if area == "Tiendas" and tienda in ("", PLACEHOLDER):
+            if area == "Confección" and tipo_intervencion == PLACEHOLDER:
+                errores.append("Selecciona la intervención.")
+            if area == "Tiendas" and tienda == PLACEHOLDER:
                 errores.append("Selecciona la tienda.")
 
             if errores:
                 for e in errores:
                     st.warning(f"⚠️ {e}")
             else:
+                marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%Y-%m-%d %H:%M:%S")
                 try:
-                    # 1. Autenticar con Google Sheets
-                    gc = get_gsheet_client()
-                    sh = gc.open_by_key(SPREADSHEET_ID)
-                    worksheet = sh.worksheet("DATOS GENERALES")
+                    if area == "Tintorería / Planta":
+                        row_data = [
+                            marca_temporal, str(hora), num_maquina, codigo_inv, tipo_maquina,
+                            tipo_mantenimiento, tipo_intervencion, elementos_str, observaciones,
+                            colaborador, req_repuestos, tipo_repuesto,
+                            costo_repuesto if req_repuestos == "Sí" else 0,
+                            gen_residuos, tipo_residuo, desc_residuo, disposicion
+                        ]
+                        guardar_en_hoja(HOJA_PLANTA, row_data)
 
-                    # 2. Generar Timestamp en hora de Bogotá
-                    marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%Y-%m-%d %H:%M:%S")
+                    elif area == "Tiendas":
+                        row_data = [
+                            marca_temporal, str(hora), tienda, tipo_mantenimiento, tipo_intervencion,
+                            elementos_str, observaciones, colaborador,
+                            gen_residuos, tipo_residuo, desc_residuo, disposicion
+                        ]
+                        guardar_en_hoja(HOJA_TIENDAS, row_data)
 
-                    # 3. Construir la fila mapeando exactamente a las 21 columnas
-                    row_data = [
-                        marca_temporal,
-                        area,
-                        str(hora),
-                        num_maquina,
-                        codigo_inv,
-                        tipo_maquina,
-                        tipo_mantenimiento,
-                        tipo_intervencion,
-                        elementos_str,
-                        observaciones,
-                        colaborador,
-                        tienda,
-                        num_modulo,
-                        trabajo_realizado,
-                        req_repuestos,
-                        tipo_repuesto,
-                        costo_repuesto if req_repuestos == "Sí" else 0,
-                        gen_residuos,
-                        tipo_residuo,
-                        desc_residuo,
-                        disposicion
-                    ]
+                    elif area == "Planta":
+                        row_data = [
+                            marca_temporal, str(hora), num_modulo, codigo_inv, tipo_maquina,
+                            tipo_mantenimiento, tipo_intervencion, trabajo_realizado,
+                            mecanico, operario_conf, req_repuestos, tipo_repuesto,
+                            costo_repuesto if req_repuestos == "Sí" else 0,
+                            gen_residuos, tipo_residuo, desc_residuo, disposicion
+                        ]
+                        guardar_en_hoja(HOJA_CONFECCION, row_data)
 
-                    # 4. Insertar fila en Google Sheets, forzando el rango exacto A:U
-                    # (evita que Sheets "adivine" mal la tabla si hay otras tablas/objetos
-                    # más a la derecha en la misma pestaña, como la del formulario viejo)
-                    col_a_values = worksheet.col_values(1)  # valores actuales de la columna A
-                    siguiente_fila = len(col_a_values) + 1
-                    worksheet.update(
-                        f"A{siguiente_fila}:U{siguiente_fila}",
-                        [row_data],
-                        value_input_option="USER_ENTERED"
-                    )
                     st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
 
                 except Exception as e:
