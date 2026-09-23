@@ -222,7 +222,7 @@ if area != "Seleccione un área...":
             else:
                 marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%Y-%m-%d %H:%M:%S")
                 try:
-                    if area == "Tintorería / Planta":
+                    if area == "Tintorería":
                         row_data = [
                             marca_temporal, str(hora), num_maquina, codigo_inv, tipo_maquina,
                             tipo_mantenimiento, tipo_intervencion, elementos_str, observaciones,
@@ -230,7 +230,7 @@ if area != "Seleccione un área...":
                             costo_repuesto if req_repuestos == "Sí" else 0,
                             gen_residuos, tipo_residuo, desc_residuo, disposicion
                         ]
-                        guardar_en_hoja(HOJA_PLANTA, row_data)
+                        guardar_en_hoja(HOJA_TINTORERIA, row_data)
 
                     elif area == "Tiendas":
                         row_data = [
@@ -248,7 +248,7 @@ if area != "Seleccione un área...":
                             costo_repuesto if req_repuestos == "Sí" else 0,
                             gen_residuos, tipo_residuo, desc_residuo, disposicion
                         ]
-                        guardar_en_hoja(HOJA_CONFECCION, row_data)
+                        guardar_en_hoja(HOJA_PLANTA, row_data)
 
                     st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
 
