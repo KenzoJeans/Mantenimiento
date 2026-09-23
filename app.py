@@ -205,11 +205,11 @@ if area != "Seleccione un área...":
         if submit_btn:
             # --- VALIDACIÓN DE CAMPOS OBLIGATORIOS ---
             errores = []
-            if area in ["Tintorería / Planta", "Confección"] and tipo_maquina == PLACEHOLDER:
+            if area in ["Tintorería", "Planta/Confección"] and tipo_maquina == PLACEHOLDER:
                 errores.append("Selecciona el tipo de máquina.")
             if tipo_mantenimiento == PLACEHOLDER:
                 errores.append("Selecciona el tipo de mantenimiento.")
-            if area == "Confección" and mecanico == PLACEHOLDER:
+            if area == "Planta/Confección" and mecanico == PLACEHOLDER:
                 errores.append("Selecciona el mecánico.")
             if area == "Confección" and tipo_intervencion == PLACEHOLDER:
                 errores.append("Selecciona la intervención.")
