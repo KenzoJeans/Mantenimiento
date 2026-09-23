@@ -2,6 +2,7 @@ import streamlit as st
 import datetime
 from zoneinfo import ZoneInfo
 import gspread
+import pandas as pd
 import os
 
 st.set_page_config(page_title="Reporte de Mantenimiento - Kenzo Jeans", page_icon="🔧", layout="wide")
@@ -49,6 +50,83 @@ def guardar_en_hoja(nombre_hoja: str, row_data: list):
     )
 
 
+def _leer_filas(nombre_hoja: str):
+    gc = get_gsheet_client()
+    sh = gc.open_by_key(SPREADSHEET_ID)
+    worksheet = sh.worksheet(nombre_hoja)
+    valores = worksheet.get_all_values()
+    return valores[1:] if len(valores) > 1 else []  # sin encabezado
+
+
+def _parsear_fecha(s):
+    try:
+        return datetime.datetime.strptime(s.strip(), "%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return pd.NaT
+
+
+def _parsear_costo(v):
+    try:
+        return float(str(v).replace(",", "").replace("$", "").strip() or 0)
+    except Exception:
+        return 0.0
+
+
+@st.cache_data(ttl=120)
+def cargar_datos_dashboard():
+    """Lee las 3 hojas por posición de columna (igual orden en que este mismo
+    script las escribe) y arma un DataFrame combinado para el dashboard."""
+    registros = []
+
+    for f in _leer_filas(HOJA_TINTORERIA):
+        if len(f) < 18:
+            continue
+        registros.append({
+            "area": "Tintorería",
+            "marca_temporal": f[0],
+            "tipo_mantenimiento": f[5],
+            "tipo_maquina": f[4],
+            "costo": f[11],
+            "residuos": f[12],
+            "responsable": f[17],
+        })
+
+    for f in _leer_filas(HOJA_TIENDAS):
+        if len(f) < 13:
+            continue
+        registros.append({
+            "area": "Tiendas",
+            "marca_temporal": f[0],
+            "tipo_mantenimiento": f[3],
+            "tipo_maquina": "",
+            "costo": 0,
+            "residuos": f[7],
+            "responsable": f[12],
+        })
+
+    for f in _leer_filas(HOJA_PLANTA):
+        if len(f) < 17:
+            continue
+        registros.append({
+            "area": "Planta/Confección",
+            "marca_temporal": f[0],
+            "tipo_mantenimiento": f[5],
+            "tipo_maquina": f[4],
+            "costo": f[10],
+            "residuos": f[12],
+            "responsable": f[15],  # mecánico
+        })
+
+    df = pd.DataFrame(registros)
+    if df.empty:
+        return df
+
+    df["fecha"] = df["marca_temporal"].apply(_parsear_fecha)
+    df["costo_num"] = df["costo"].apply(_parsear_costo)
+    return df
+
+
+# --- ENCABEZADO CON LOGO ---
 col_logo, col_titulo = st.columns([1, 5])
 with col_logo:
     if os.path.exists(LOGO_PATH):
@@ -61,208 +139,262 @@ with col_titulo:
 
 st.markdown("---")
 
-mecanicos = [PLACEHOLDER, "Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
-tipos_intervencion_conf = [
-    PLACEHOLDER, "Ajuste mecánico", "Instalación del folder", "Ajuste de tensión",
-    "Cambio de elementos", "Programación de máquina"
-]
-tipos_mantenimiento_general = [PLACEHOLDER, "Preventivo", "Correctivo", "Predictivo"]
-tipos_mantenimiento_tiendas = [PLACEHOLDER, "Preventivo", "Correctivo", "Locativo"]
-tipos_mantenimiento_confeccion = [PLACEHOLDER, "Preventivo", "Correctivo", "Alistamiento", "Adecuación"]
+tab_registro, tab_dashboard = st.tabs(["📝 Registrar Reporte", "📊 Dashboard"])
 
-maquinas_confeccion = [PLACEHOLDER] + [
-    "CADENETA", "FILETEADORA", "PLANA", "DOS AGUJAS", "COLLARIN PLANA", "COLLARIN CILINDRICA",
-    "COLLARIN CODO", "EMPRETINADORA", "PRESILLADORA", "MAQUINA DE BOTAS", "MAQUINA DE J",
-    "DIBUJADORA", "OJALADORA DE CAMISA", "OJALADORA DE LÁGRIMA", "PEGAR PASADORES", "HACER PASADORES",
-    "RIBETEADORA", "FUSIONADORA", "VOLTEADORA DE PANTALÓN", "DOBLADILLADORA DE BOLSILLO", "CERRADORA",
-    "CERRADORA DE CAMISA", "CERRADORA DE CODO", "CERRADORA DE PEDESTAL", "CORTADORA VERTICAL",
-    "CORTADORA AUTOMÁTICA", "LÁSER", "BORDADORA", "TACHADORA", "PARCHADORA", "MULTIAGUJAS",
-    "BOTONADORA", "REVISADORA DE TELAS", "MAQUINA FUSIONADORA"
-]
+# ============================================================
+# PESTAÑA 1: REGISTRAR REPORTE
+# ============================================================
+with tab_registro:
 
-maquinas_tintoreria = [PLACEHOLDER] + [
-    "LAVADORA", "SECADORA", "CENTÍFUGA", "LASER", "LAVADORA DE MUESTRAS",
-    "SECADORA DE MUESTRAS", "CENTRÍFUGA DE MUESTRAS", "TERMOFIJADORA",
-    "MOTORTOOL", "VARIBOOSTER", "PRENSA"
-]
+    mecanicos = [PLACEHOLDER, "Jonathan Borrego", "Cristobal Castellanos", "Felipe Cárdenas", "Jhon Jairo Gómez"]
+    tipos_intervencion_conf = [
+        PLACEHOLDER, "Ajuste mecánico", "Instalación del folder", "Ajuste de tensión",
+        "Cambio de elementos", "Programación de máquina"
+    ]
+    tipos_mantenimiento_general = [PLACEHOLDER, "Preventivo", "Correctivo", "Predictivo"]
+    tipos_mantenimiento_tiendas = [PLACEHOLDER, "Preventivo", "Correctivo", "Locativo"]
+    tipos_mantenimiento_confeccion = [PLACEHOLDER, "Preventivo", "Correctivo", "Alistamiento", "Adecuación"]
 
-elementos_tintoreria = [
-    "CABLES", "MOTOR", "MULETILLAS", "RELÉS", "PULSADORES", "CONTACTORES", "TARJETAS",
-    "PLC", "RESISTENCIAS", "CILINDROS", "VÁLVULAS", "ELECTROVÁLVULAS", "RODAMIENTOS",
-    "EJES", "CHUMACERAS", "ENGRASES", "BOMBAS", "BOOSTER", "VÁLVULA MANUAL", "SERPENTINES",
-    "PIÑONES", "TEMPORIZADOR", "POLEAS", "CORREA", "FUSIBLES", "AJUSTE DE BORNES", "RESORTES"
-]
+    maquinas_confeccion = [PLACEHOLDER] + [
+        "CADENETA", "FILETEADORA", "PLANA", "DOS AGUJAS", "COLLARIN PLANA", "COLLARIN CILINDRICA",
+        "COLLARIN CODO", "EMPRETINADORA", "PRESILLADORA", "MAQUINA DE BOTAS", "MAQUINA DE J",
+        "DIBUJADORA", "OJALADORA DE CAMISA", "OJALADORA DE LÁGRIMA", "PEGAR PASADORES", "HACER PASADORES",
+        "RIBETEADORA", "FUSIONADORA", "VOLTEADORA DE PANTALÓN", "DOBLADILLADORA DE BOLSILLO", "CERRADORA",
+        "CERRADORA DE CAMISA", "CERRADORA DE CODO", "CERRADORA DE PEDESTAL", "CORTADORA VERTICAL",
+        "CORTADORA AUTOMÁTICA", "LÁSER", "BORDADORA", "TACHADORA", "PARCHADORA", "MULTIAGUJAS",
+        "BOTONADORA", "REVISADORA DE TELAS", "MAQUINA FUSIONADORA"
+    ]
 
-tiendas_kenzo = [PLACEHOLDER] + [
-    "SALITRE PLAZA", "RESTREPO 1", "FONTIBON", "QUIRIGUA", "TUNAL",
-    "PLAZA D LAS AMERICAS 1(Mujer)", "CENTRO SUBA", "SANTA HELENITA", "KENNEDY",
-    "CHAPINERO", "ESTRADA", "CENTRO 1", "RESTREPO 2", "OUTLET ZONA", "PORTAL 80",
-    "UNICENTRO OCCIDENTE", "YOPAL", "TINTAL PLAZA", "IMPERIAL", "SANTAFE",
-    "CENTRO MAYOR", "TITAN PLAZA", "DIVER PLAZA", "ZIPAQUIRA", "MERCURIO",
-    "FACTORY", "MOSQUERA", "HAYUELOS", "PLAZA D LAS AMERICAS 2 (Hombre)",
-    "FUNZA MICENTRO", "GIRARDOT", "IPIALES", "CALLE 13 ZONA", "POPAYAN",
-    "PLAZA CENTRAL", "BOSA PIAMONTE CALLE", "TOBERIN", "VENTURA TERREROS",
-    "GRAN PLAZA ENSUEÑO", "CAJICA", "TUNJA", "GRAN PLAZA BOSA", "PASEO VILLA DEL RIO",
-    "NUESTRO BOGOTA", "ATREVETE FONTIBON", "ATREVETE SEVILLANA", "MADRID",
-    "CARRERA 62", "OUTLET CENTER", "FUSAGASUGA", "ALTA VISTA", "OUTLET CARRERA 62",
-    "RIO NEGRO - ANTIOQUIA", "OUTLET FLORESTA", "ESPINAL", "FUNZA CENTRO"
-]
+    maquinas_tintoreria = [PLACEHOLDER] + [
+        "LAVADORA", "SECADORA", "CENTÍFUGA", "LASER", "LAVADORA DE MUESTRAS",
+        "SECADORA DE MUESTRAS", "CENTRÍFUGA DE MUESTRAS", "TERMOFIJADORA",
+        "MOTORTOOL", "VARIBOOSTER", "PRENSA"
+    ]
 
-area = st.selectbox(
-    "1. ÁREA A LA QUE VA A REALIZAR EL MANTENIMIENTO",
-    ["Seleccione un área...", "Tintorería", "Tiendas", "Planta/Confección"]
-)
+    elementos_tintoreria = [
+        "CABLES", "MOTOR", "MULETILLAS", "RELÉS", "PULSADORES", "CONTACTORES", "TARJETAS",
+        "PLC", "RESISTENCIAS", "CILINDROS", "VÁLVULAS", "ELECTROVÁLVULAS", "RODAMIENTOS",
+        "EJES", "CHUMACERAS", "ENGRASES", "BOMBAS", "BOOSTER", "VÁLVULA MANUAL", "SERPENTINES",
+        "PIÑONES", "TEMPORIZADOR", "POLEAS", "CORREA", "FUSIBLES", "AJUSTE DE BORNES", "RESORTES"
+    ]
 
-if area != "Seleccione un área...":
+    tiendas_kenzo = [PLACEHOLDER] + [
+        "SALITRE PLAZA", "RESTREPO 1", "FONTIBON", "QUIRIGUA", "TUNAL",
+        "PLAZA D LAS AMERICAS 1(Mujer)", "CENTRO SUBA", "SANTA HELENITA", "KENNEDY",
+        "CHAPINERO", "ESTRADA", "CENTRO 1", "RESTREPO 2", "OUTLET ZONA", "PORTAL 80",
+        "UNICENTRO OCCIDENTE", "YOPAL", "TINTAL PLAZA", "IMPERIAL", "SANTAFE",
+        "CENTRO MAYOR", "TITAN PLAZA", "DIVER PLAZA", "ZIPAQUIRA", "MERCURIO",
+        "FACTORY", "MOSQUERA", "HAYUELOS", "PLAZA D LAS AMERICAS 2 (Hombre)",
+        "FUNZA MICENTRO", "GIRARDOT", "IPIALES", "CALLE 13 ZONA", "POPAYAN",
+        "PLAZA CENTRAL", "BOSA PIAMONTE CALLE", "TOBERIN", "VENTURA TERREROS",
+        "GRAN PLAZA ENSUEÑO", "CAJICA", "TUNJA", "GRAN PLAZA BOSA", "PASEO VILLA DEL RIO",
+        "NUESTRO BOGOTA", "ATREVETE FONTIBON", "ATREVETE SEVILLANA", "MADRID",
+        "CARRERA 62", "OUTLET CENTER", "FUSAGASUGA", "ALTA VISTA", "OUTLET CARRERA 62",
+        "RIO NEGRO - ANTIOQUIA", "OUTLET FLORESTA", "ESPINAL", "FUNZA CENTRO"
+    ]
 
-    # --- 1. Preguntas interactivas FUERA del st.form ---
-    st.markdown("### ⚙️ Repuestos y Residuos")
-    col_rep_top, col_res_top = st.columns(2)
+    area = st.selectbox(
+        "1. ÁREA A LA QUE VA A REALIZAR EL MANTENIMIENTO",
+        ["Seleccione un área...", "Tintorería", "Tiendas", "Planta/Confección"]
+    )
 
-    req_repuestos = "No"
-    with col_rep_top:
-        if area in ["Tintorería", "Planta/Confección"]:
-            req_repuestos = st.radio(
-                "¿Se requieren repuestos?", 
-                ["No", "Sí"], 
-                key=f"radio_rep_{area}"
-            )
+    if area != "Seleccione un área...":
+        with st.form(key=f"form_mantenimiento_{area}", clear_on_submit=True):
 
-    with col_res_top:
-        gen_residuos = st.radio(
-            "¿Generó residuos?", 
-            ["No", "Sí"], 
-            key=f"radio_res_{area}"
-        )
+            hora_default = datetime.datetime.now(TZ_BOGOTA).time()
 
-    # --- 2. Formulario principal ---
-    with st.form(key=f"form_mantenimiento_{area}", clear_on_submit=True):
+            if area == "Tintorería":
+                col1, col2 = st.columns(2)
+                with col1:
+                    hora = st.time_input("2. Hora de mantenimiento", hora_default)
+                    num_maquina = st.text_input("3. Número de máquina (KPL)")
+                    tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_tintoreria)
+                    tipo_intervencion = st.text_input("7. Tipo de intervención")
+                with col2:
+                    codigo_inv = st.text_input("4. Código de inventario").upper()
+                    tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_general)
+                    elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria)
+                    elementos_str = ", ".join(elementos)
 
-        hora_default = datetime.datetime.now(TZ_BOGOTA).time()
+                observaciones = st.text_area("9. Observaciones del mantenimiento")
+                colaborador = st.text_input("17. Colaborador que realizó el mantenimiento")
 
-        if area == "Tintorería":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora de mantenimiento", hora_default)
-                num_maquina = st.text_input("3. Número de máquina (KPL)")
-                tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_tintoreria)
-                tipo_intervencion = st.text_input("7. Tipo de intervención")
-            with col2:
-                codigo_inv = st.text_input("4. Código de inventario").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_general)
-                elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria)
-                elementos_str = ", ".join(elementos)
+            elif area == "Tiendas":
+                col1, col2 = st.columns(2)
+                with col1:
+                    hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
+                    tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", tipos_mantenimiento_tiendas)
+                    elementos_str = st.text_area("6. Elementos a intervenir")
+                with col2:
+                    tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo)
+                    tipo_intervencion = st.text_input("5. Tipo de intervención")
+                    colaborador = st.text_input("12. Operario que realizó el mantenimiento")
 
-            observaciones = st.text_area("9. Observaciones del mantenimiento")
-            colaborador = st.text_input("17. Colaborador que realizó el mantenimiento")
+                observaciones = st.text_area("7. Observaciones del mantenimiento")
 
-        elif area == "Tiendas":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
-                tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", tipos_mantenimiento_tiendas)
-                elementos_str = st.text_area("6. Elementos a intervenir")
-            with col2:
-                tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo)
-                tipo_intervencion = st.text_input("5. Tipo de intervención")
-                colaborador = st.text_input("12. Operario que realizó el mantenimiento")
+            elif area == "Planta/Confección":
+                col1, col2 = st.columns(2)
+                with col1:
+                    hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
+                    codigo_inv = st.text_input("4. Código Inventario KPL").upper()
+                    tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_confeccion)
+                    trabajo_realizado = st.text_area("8. Trabajo realizado")
+                    mecanico = st.selectbox("15. Mecánico", mecanicos)
+                with col2:
+                    num_modulo = st.text_input("3. Número de módulo")
+                    tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion)
+                    tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf)
+                    operario_conf = st.text_input("16. Nombre Operario")
 
-            observaciones = st.text_area("7. Observaciones del mantenimiento")
+            st.markdown("### ⚙️ Repuestos y Residuos")
+            col_rep, col_res = st.columns(2)
 
-        elif area == "Planta/Confección":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", hora_default)
-                codigo_inv = st.text_input("4. Código Inventario KPL").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_confeccion)
-                trabajo_realizado = st.text_area("8. Trabajo realizado")
-                mecanico = st.selectbox("15. Mecánico", mecanicos)
-            with col2:
-                num_modulo = st.text_input("3. Número de módulo")
-                tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion)
-                tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf)
-                operario_conf = st.text_input("16. Nombre Operario")
+            req_repuestos = "No"
+            tipo_repuesto = ""
+            costo_repuesto = 0.0
 
-        # --- 3. Campos condicionales DENTRO del form (se activan según los radio anteriores) ---
-        tipo_repuesto = ""
-        costo_repuesto = 0.0
-        if req_repuestos == "Sí":
-            st.markdown("#### Detalle de Repuestos")
-            col_r1, col_r2 = st.columns(2)
-            with col_r1:
-                tipo_repuesto = st.text_input("Tipo de repuesto")
-            with col_r2:
-                costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0)
+            with col_rep:
+                if area in ["Tintorería", "Planta/Confección"]:
+                    req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"])
+                    if req_repuestos == "Sí":
+                        tipo_repuesto = st.text_input("Tipo de repuesto")
+                        costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0)
 
-        tipo_residuo = ""
-        desc_residuo = ""
-        disposicion = ""
-        if gen_residuos == "Sí":
-            st.markdown("#### Detalle de Residuos")
-            col_w1, col_w2, col_w3 = st.columns(3)
-            with col_w1:
-                tipo_residuo = st.selectbox("Tipo de residuo", ["Aprovechable", "No Aprovechable", "Peligroso / Químico", "Especial"])
-            with col_w2:
-                desc_residuo = st.text_input("Descripción del residuo")
-            with col_w3:
-                disposicion = st.text_input("Disposición final")
+            gen_residuos = "No"
+            tipo_residuo = ""
+            desc_residuo = ""
+            disposicion = ""
+
+            with col_res:
+                gen_residuos = st.radio("¿Generó residuos?", ["No", "Sí"])
+                if gen_residuos == "Sí":
+                    tipo_residuo = st.selectbox("Tipo de residuo", ["Aprovechable", "No Aprovechable", "Peligroso / Químico", "Especial"])
+                    desc_residuo = st.text_input("Descripción del residuo")
+                    disposicion = st.text_input("Disposición final")
+
+            st.markdown("---")
+            submit_btn = st.form_submit_button("Guardar Reporte", type="primary")
+
+            if submit_btn:
+                errores = []
+                if area in ["Tintorería", "Planta/Confección"] and tipo_maquina == PLACEHOLDER:
+                    errores.append("Selecciona el tipo de máquina.")
+                if tipo_mantenimiento == PLACEHOLDER:
+                    errores.append("Selecciona el tipo de mantenimiento.")
+                if area == "Planta/Confección" and mecanico == PLACEHOLDER:
+                    errores.append("Selecciona el mecánico.")
+                if area == "Planta/Confección" and tipo_intervencion == PLACEHOLDER:
+                    errores.append("Selecciona la intervención.")
+                if area == "Tiendas" and tienda == PLACEHOLDER:
+                    errores.append("Selecciona la tienda.")
+
+                if errores:
+                    for e in errores:
+                        st.warning(f"⚠️ {e}")
+                else:
+                    marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%d/%m/%Y %H:%M:%S")
+                    try:
+                        costo_final = costo_repuesto if req_repuestos == "Sí" else 0
+                        FOTO = ""  # placeholder para "Adjuntar imagen" / "REGISTRO FOTOGRAFICO" (aún no implementado)
+
+                        if area == "Tintorería":
+                            row_data = [
+                                marca_temporal, str(hora), num_maquina, codigo_inv, tipo_maquina,
+                                tipo_mantenimiento, tipo_intervencion, elementos_str, observaciones,
+                                req_repuestos, tipo_repuesto, costo_final,
+                                gen_residuos, tipo_residuo, desc_residuo, FOTO,
+                                disposicion, colaborador
+                            ]
+                            guardar_en_hoja(HOJA_TINTORERIA, row_data)
+
+                        elif area == "Tiendas":
+                            row_data = [
+                                marca_temporal, str(hora), tienda, tipo_mantenimiento, tipo_intervencion,
+                                elementos_str, observaciones,
+                                gen_residuos, tipo_residuo, desc_residuo, FOTO,
+                                disposicion, colaborador
+                            ]
+                            guardar_en_hoja(HOJA_TIENDAS, row_data)
+
+                        elif area == "Planta/Confección":
+                            row_data = [
+                                marca_temporal, str(hora), num_modulo, codigo_inv, tipo_maquina,
+                                tipo_mantenimiento, tipo_intervencion, trabajo_realizado,
+                                req_repuestos, tipo_repuesto, costo_final, FOTO,
+                                gen_residuos, tipo_residuo, desc_residuo,
+                                mecanico, operario_conf
+                            ]
+                            guardar_en_hoja(HOJA_PLANTA, row_data)
+                        else:
+                            st.error("❌ Área no reconocida, no se guardó el reporte.")
+                            st.stop()
+
+                        cargar_datos_dashboard.clear()  # refresca el dashboard con el nuevo dato
+                        st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
+
+                    except Exception as e:
+                        st.error(f"❌ Error al conectar o guardar en Google Sheets: {e}")
+
+# ============================================================
+# PESTAÑA 2: DASHBOARD
+# ============================================================
+with tab_dashboard:
+    st.subheader("📊 Vista general de mantenimiento")
+
+    if st.button("🔄 Actualizar datos"):
+        cargar_datos_dashboard.clear()
+
+    df = cargar_datos_dashboard()
+
+    if df.empty:
+        st.info("Todavía no hay reportes guardados para mostrar.")
+    else:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total de reportes", len(df))
+        col2.metric("Costo total en repuestos", f"${df['costo_num'].sum():,.0f}")
+
+        residuos_si = df["residuos"].astype(str).str.strip().str.lower().eq("sí").mean() * 100
+        col3.metric("% con residuos generados", f"{residuos_si:.0f}%")
+
+        if df["fecha"].notna().any():
+            mes_actual = datetime.datetime.now(TZ_BOGOTA).month
+            anio_actual = datetime.datetime.now(TZ_BOGOTA).year
+            reportes_mes = df[(df["fecha"].dt.month == mes_actual) & (df["fecha"].dt.year == anio_actual)].shape[0]
+        else:
+            reportes_mes = 0
+        col4.metric("Reportes este mes", reportes_mes)
 
         st.markdown("---")
-        submit_btn = st.form_submit_button("Guardar Reporte", type="primary")
 
-        # (Mantener la lógica de guardado y validaciones de submit_btn exactamente igual)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Reportes por área**")
+            st.bar_chart(df["area"].value_counts())
+        with c2:
+            st.markdown("**Distribución por tipo de mantenimiento**")
+            tm = df["tipo_mantenimiento"].replace("", "Sin dato")
+            st.bar_chart(tm.value_counts())
 
-        if submit_btn:
-            errores = []
-            if area in ["Tintorería", "Planta/Confección"] and tipo_maquina == PLACEHOLDER:
-                errores.append("Selecciona el tipo de máquina.")
-            if tipo_mantenimiento == PLACEHOLDER:
-                errores.append("Selecciona el tipo de mantenimiento.")
-            if area == "Planta/Confección" and mecanico == PLACEHOLDER:
-                errores.append("Selecciona el mecánico.")
-            if area == "Planta/Confección" and tipo_intervencion == PLACEHOLDER:
-                errores.append("Selecciona la intervención.")
-            if area == "Tiendas" and tienda == PLACEHOLDER:
-                errores.append("Selecciona la tienda.")
+        st.markdown("**Top 10 máquinas con más intervenciones**")
+        top_maquinas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts().head(10)
+        if not top_maquinas.empty:
+            st.bar_chart(top_maquinas)
+        else:
+            st.caption("Sin datos de máquina todavía.")
 
-            if errores:
-                for e in errores:
-                    st.warning(f"⚠️ {e}")
-            else:
-                marca_temporal = datetime.datetime.now(TZ_BOGOTA).strftime("%d/%m/%Y %H:%M:%S")
-                try:
-                    if area == "Tintorería":
-                        row_data = [
-                            marca_temporal, str(hora), num_maquina, codigo_inv, tipo_maquina,
-                            tipo_mantenimiento, tipo_intervencion, elementos_str, observaciones,
-                            colaborador, req_repuestos, tipo_repuesto,
-                            costo_repuesto if req_repuestos == "Sí" else 0,
-                            gen_residuos, tipo_residuo, desc_residuo, disposicion
-                        ]
-                        guardar_en_hoja(HOJA_TINTORERIA, row_data)
+        st.markdown("**Reportes a lo largo del tiempo**")
+        if df["fecha"].notna().any():
+            por_dia = df.dropna(subset=["fecha"]).groupby(df["fecha"].dt.date).size()
+            st.line_chart(por_dia)
+        else:
+            st.caption("No se pudieron leer fechas para graficar la tendencia.")
 
-                    elif area == "Tiendas":
-                        row_data = [
-                            marca_temporal, str(hora), tienda, tipo_mantenimiento, tipo_intervencion,
-                            elementos_str, observaciones, colaborador,
-                            gen_residuos, tipo_residuo, desc_residuo, disposicion
-                        ]
-                        guardar_en_hoja(HOJA_TIENDAS, row_data)
+        st.markdown("**Carga por responsable (mecánico / operario / colaborador)**")
+        top_resp = df[df["responsable"] != ""]["responsable"].value_counts().head(10)
+        if not top_resp.empty:
+            st.bar_chart(top_resp)
+        else:
+            st.caption("Sin datos de responsable todavía.")
 
-                    elif area == "Planta/Confección":
-                        row_data = [
-                            marca_temporal, str(hora), num_modulo, codigo_inv, tipo_maquina,
-                            tipo_mantenimiento, tipo_intervencion, trabajo_realizado,
-                            mecanico, operario_conf, req_repuestos, tipo_repuesto,
-                            costo_repuesto if req_repuestos == "Sí" else 0,
-                            gen_residuos, tipo_residuo, desc_residuo, disposicion
-                        ]
-                        guardar_en_hoja(HOJA_PLANTA, row_data)
-                    else:
-                        st.error("❌ Área no reconocida, no se guardó el reporte.")
-                        st.stop()
-
-                    st.success("✅ ¡El reporte se guardó correctamente en Google Sheets!")
-
-                except Exception as e:
-                    st.error(f"❌ Error al conectar o guardar en Google Sheets: {e}")
+        with st.expander("Ver datos completos"):
+            st.dataframe(df.drop(columns=["costo", "marca_temporal"]), use_container_width=True)
