@@ -195,73 +195,59 @@ with tab_registro:
         hora_default = datetime.datetime.now(TZ_BOGOTA).time()
 
         if area == "Tintorería":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora de mantenimiento", hora_default, key=f"hora_{v}")
-                num_maquina = st.text_input("3. Número de máquina (KPL)", key=f"num_maquina_{v}")
-                tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_tintoreria, key=f"tipo_maquina_{v}")
-                tipo_intervencion = st.text_input("7. Tipo de intervención", key=f"tipo_intervencion_{v}")
-            with col2:
-                codigo_inv = st.text_input("4. Código de inventario", key=f"codigo_inv_{v}").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_general, key=f"tipo_mant_{v}")
-                elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria, key=f"elementos_{v}")
-                elementos_str = ", ".join(elementos)
-
+            hora = st.time_input("2. Hora de mantenimiento", hora_default, key=f"hora_{v}")
+            num_maquina = st.text_input("3. Número de máquina (KPL)", key=f"num_maquina_{v}")
+            codigo_inv = st.text_input("4. Código de inventario", key=f"codigo_inv_{v}").upper()
+            tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_tintoreria, key=f"tipo_maquina_{v}")
+            tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_general, key=f"tipo_mant_{v}")
+            tipo_intervencion = st.text_input("7. Tipo de intervención", key=f"tipo_intervencion_{v}")
+            elementos = st.multiselect("8. Elementos a intervenir", elementos_tintoreria, key=f"elementos_{v}")
+            elementos_str = ", ".join(elementos)
             observaciones = st.text_area("9. Observaciones del mantenimiento", key=f"obs_{v}")
             colaborador = st.text_input("17. Colaborador que realizó el mantenimiento", key=f"colaborador_{v}")
 
         elif area == "Tiendas":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", hora_default, key=f"hora_{v}")
-                tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", tipos_mantenimiento_tiendas, key=f"tipo_mant_{v}")
-                elementos_str = st.text_area("6. Elementos a intervenir", key=f"elementos_str_{v}")
-            with col2:
-                tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo, key=f"tienda_{v}")
-                tipo_intervencion = st.text_input("5. Tipo de intervención", key=f"tipo_intervencion_{v}")
-                colaborador = st.text_input("12. Operario que realizó el mantenimiento", key=f"colaborador_{v}")
-
+            hora = st.time_input("2. Hora inicio mantenimiento", hora_default, key=f"hora_{v}")
+            tienda = st.selectbox("3. Tienda donde se realiza", tiendas_kenzo, key=f"tienda_{v}")
+            tipo_mantenimiento = st.selectbox("4. Tipo de mantenimiento", tipos_mantenimiento_tiendas, key=f"tipo_mant_{v}")
+            tipo_intervencion = st.text_input("5. Tipo de intervención", key=f"tipo_intervencion_{v}")
+            elementos_str = st.text_area("6. Elementos a intervenir", key=f"elementos_str_{v}")
             observaciones = st.text_area("7. Observaciones del mantenimiento", key=f"obs_{v}")
+            colaborador = st.text_input("12. Operario que realizó el mantenimiento", key=f"colaborador_{v}")
 
         elif area == "Planta/Confección":
-            col1, col2 = st.columns(2)
-            with col1:
-                hora = st.time_input("2. Hora inicio mantenimiento", hora_default, key=f"hora_{v}")
-                codigo_inv = st.text_input("4. Código Inventario KPL", key=f"codigo_inv_{v}").upper()
-                tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_confeccion, key=f"tipo_mant_{v}")
-                trabajo_realizado = st.text_area("8. Trabajo realizado", key=f"trabajo_{v}")
-                mecanico = st.selectbox("15. Mecánico", mecanicos, key=f"mecanico_{v}")
-            with col2:
-                num_modulo = st.text_input("3. Número de módulo", key=f"num_modulo_{v}")
-                tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion, key=f"tipo_maquina_{v}")
-                tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf, key=f"tipo_intervencion_{v}")
-                operario_conf = st.text_input("16. Nombre Operario", key=f"operario_{v}")
+            hora = st.time_input("2. Hora inicio mantenimiento", hora_default, key=f"hora_{v}")
+            num_modulo = st.text_input("3. Número de módulo", key=f"num_modulo_{v}")
+            codigo_inv = st.text_input("4. Código Inventario KPL", key=f"codigo_inv_{v}").upper()
+            tipo_maquina = st.selectbox("5. Tipo de máquina", maquinas_confeccion, key=f"tipo_maquina_{v}")
+            tipo_mantenimiento = st.selectbox("6. Tipo de mantenimiento", tipos_mantenimiento_confeccion, key=f"tipo_mant_{v}")
+            tipo_intervencion = st.selectbox("7. Intervención", tipos_intervencion_conf, key=f"tipo_intervencion_{v}")
+            trabajo_realizado = st.text_area("8. Trabajo realizado", key=f"trabajo_{v}")
+            mecanico = st.selectbox("15. Mecánico", mecanicos, key=f"mecanico_{v}")
+            operario_conf = st.text_input("16. Nombre Operario", key=f"operario_{v}")
 
         st.markdown("### ⚙️ Repuestos y Residuos")
-        col_rep, col_res = st.columns(2)
 
         req_repuestos = "No"
         tipo_repuesto = ""
         costo_repuesto = 0.0
 
-        with col_rep:
-            if area in ["Tintorería", "Planta/Confección"]:
-                req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"], key=f"req_repuestos_{v}")
-                if req_repuestos == "Sí":
-                    tipo_repuesto = st.text_input("Tipo de repuesto", key=f"tipo_repuesto_{v}")
-                    costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0, key=f"costo_repuesto_{v}")
+        if area in ["Tintorería", "Planta/Confección"]:
+            req_repuestos = st.radio("¿Se requieren repuestos?", ["No", "Sí"], key=f"req_repuestos_{v}")
+            if req_repuestos == "Sí":
+                tipo_repuesto = st.text_input("Tipo de repuesto", key=f"tipo_repuesto_{v}")
+                costo_repuesto = st.number_input("Costo de repuesto ($)", min_value=0.0, step=1000.0, key=f"costo_repuesto_{v}")
 
         gen_residuos = "No"
         tipo_residuo = ""
         desc_residuo = ""
         disposicion = ""
 
-        with col_res:
-            gen_residuos = st.radio("¿Generó residuos?", ["No", "Sí"], key=f"gen_residuos_{v}")
-            if gen_residuos == "Sí":
-                tipo_residuo = st.selectbox("Tipo de residuo", ["Aprovechable", "No Aprovechable", "Peligroso / Químico", "Especial"], key=f"tipo_residuo_{v}")
-                desc_residuo = st.text_input("Descripción del residuo", key=f"desc_residuo_{v}")
-                disposicion = st.text_input("Disposición final", key=f"disposicion_{v}")
+        gen_residuos = st.radio("¿Generó residuos?", ["No", "Sí"], key=f"gen_residuos_{v}")
+        if gen_residuos == "Sí":
+            tipo_residuo = st.selectbox("Tipo de residuo", ["Aprovechable", "No Aprovechable", "Peligroso / Químico", "Especial"], key=f"tipo_residuo_{v}")
+            desc_residuo = st.text_input("Descripción del residuo", key=f"desc_residuo_{v}")
+            disposicion = st.text_input("Disposición final", key=f"disposicion_{v}")
 
         st.markdown("---")
         submit_btn = st.button("Guardar Reporte", type="primary", key=f"submit_{v}")
