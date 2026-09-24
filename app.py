@@ -323,40 +323,97 @@ with tab_dashboard:
     if st.button("🔄 Actualizar datos"):
         cargar_datos_dashboard.clear()
 
-    df = cargar_datos_dashboard()
+    df_completo = cargar_datos_dashboard()
 
-    if df.empty:
+    if df_completo.empty:
         st.info("Todavía no hay reportes guardados para mostrar.")
     else:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total de reportes", len(df))
-        col2.metric("Costo total en repuestos", f"${df['costo_num'].sum():,.0f}")
+        # --- FILTROS ---
+        with st.container(border=True):
+            fc1, fc2 = st.columns([1, 2])
+            with fc1:
+                areas_filtro = st.multiselect(
+                    "Área",
+                    options=sorted(df_completo["area"].unique()),
+                    default=sorted(df_completo["area"].unique())
+                )
+            with fc2:
+                fechas_validas = df_completo["fecha"].dropna()
+                if not fechas_validas.empty:
+                    rango = st.date_input(
+                        "Rango de fechas",
+                        value=(fechas_validas.min().date(), fechas_validas.max().date()),
+                        min_value=fechas_validas.min().date(),
+                        max_value=fechas_validas.max().date()
+                    )
+                else:
+                    rango = None
 
-        residuos_si = df["residuos"].astype(str).str.strip().str.lower().eq("sí").mean() * 100
-        col3.metric("% con residuos generados", f"{residuos_si:.0f}%")
+        df = df_completo[df_completo["area"].isin(areas_filtro)].copy()
+        if rango and isinstance(rango, tuple) and len(rango) == 2:
+            desde, hasta = rango
+            df = df[(df["fecha"].isna()) | ((df["fecha"].dt.date >= desde) & (df["fecha"].dt.date <= hasta))]
 
-        if df["fecha"].notna().any():
-            mes_actual = datetime.datetime.now(TZ_BOGOTA).month
-            anio_actual = datetime.datetime.now(TZ_BOGOTA).year
-            reportes_mes = df[(df["fecha"].dt.month == mes_actual) & (df["fecha"].dt.year == anio_actual)].shape[0]
+        if df.empty:
+            st.warning("No hay reportes que coincidan con los filtros seleccionados.")
         else:
-            reportes_mes = 0
-        col4.metric("Reportes este mes", reportes_mes)
+            # --- Ventana anterior equivalente, para comparar (deltas) ---
+            df_prev = pd.DataFrame()
+            if rango and isinstance(rango, tuple) and len(rango) == 2 and desde <= hasta:
+                dias = (hasta - desde).days + 1
+                desde_prev = desde - datetime.timedelta(days=dias)
+                hasta_prev = desde - datetime.timedelta(days=1)
+                df_prev = df_completo[
+                    df_completo["area"].isin(areas_filtro)
+                    & df_completo["fecha"].notna()
+                    & (df_completo["fecha"].dt.date >= desde_prev)
+                    & (df_completo["fecha"].dt.date <= hasta_prev)
+                ]
 
-        st.markdown("---")
+            def _delta(actual, previo):
+                if df_prev.empty:
+                    return None
+                diferencia = actual - previo
+                return f"{diferencia:+,.0f} vs. período anterior"
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Reportes por área**")
-            st.bar_chart(df["area"].value_counts(), color=COLOR_PRIMARIO)
-        with c2:
-            st.markdown("**Distribución por tipo de mantenimiento**")
-            tm = df["tipo_mantenimiento"].replace("", "Sin dato")
-            st.bar_chart(tm.value_counts(), color=COLOR_SECUNDARIO)
+            total_actual = len(df)
+            costo_actual = df["costo_num"].sum()
+            residuos_actual = df["residuos"].astype(str).str.strip().str.lower().eq("sí").mean() * 100
 
-        st.markdown("**Top 10 máquinas con más intervenciones**")
-        top_maquinas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts().head(10)
-        if not top_maquinas.empty:
-            st.bar_chart(top_maquinas, color=COLOR_TERCIARIO)
-        else:
-            st.caption("Sin datos de máquina todavía.")
+            total_prev = len(df_prev) if not df_prev.empty else 0
+            costo_prev = df_prev["costo_num"].sum() if not df_prev.empty else 0
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total de reportes", total_actual, delta=_delta(total_actual, total_prev))
+            col2.metric("Costo total en repuestos", f"${costo_actual:,.0f}", delta=_delta(costo_actual, costo_prev))
+            col3.metric("% con residuos generados", f"{residuos_actual:.0f}%")
+
+            # --- Insight destacado ---
+            maquinas_validas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts()
+            mant_validos = df["tipo_mantenimiento"].replace("", pd.NA).dropna().value_counts()
+            partes_insight = []
+            if not maquinas_validas.empty:
+                partes_insight.append(f"la máquina con más fallas fue **{maquinas_validas.index[0]}** ({maquinas_validas.iloc[0]} intervenciones)")
+            if not mant_validos.empty:
+                pct_top = mant_validos.iloc[0] / mant_validos.sum() * 100
+                partes_insight.append(f"**{mant_validos.index[0]}** representó el {pct_top:.0f}% de los mantenimientos")
+            if partes_insight:
+                st.info("💡 En el período seleccionado, " + " y ".join(partes_insight) + ".")
+
+            st.markdown("---")
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("**Reportes por área**")
+                st.bar_chart(df["area"].value_counts(), color=COLOR_PRIMARIO)
+            with c2:
+                st.markdown("**Distribución por tipo de mantenimiento**")
+                tm = df["tipo_mantenimiento"].replace("", "Sin dato")
+                st.bar_chart(tm.value_counts(), color=COLOR_SECUNDARIO)
+
+            st.markdown("**Top 10 máquinas con más intervenciones**")
+            top_maquinas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts().head(10)
+            if not top_maquinas.empty:
+                st.bar_chart(top_maquinas, color=COLOR_TERCIARIO)
+            else:
+                st.caption("Sin datos de máquina todavía.")
