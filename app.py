@@ -320,6 +320,24 @@ with tab_registro:
 with tab_dashboard:
     st.subheader("📊 Vista general de mantenimiento")
 
+    if "dashboard_autenticado" not in st.session_state:
+        st.session_state.dashboard_autenticado = False
+
+    if not st.session_state.dashboard_autenticado:
+        st.info("🔒 Esta sección es solo para personal autorizado.")
+        clave_ingresada = st.text_input("Contraseña", type="password", key="clave_dashboard")
+        if st.button("Ingresar"):
+            if clave_ingresada == st.secrets.get("dashboard_password", ""):
+                st.session_state.dashboard_autenticado = True
+                st.rerun()
+            else:
+                st.error("❌ Contraseña incorrecta.")
+        st.stop()
+
+    if st.button("🔒 Cerrar sesión del dashboard"):
+        st.session_state.dashboard_autenticado = False
+        st.rerun()
+
     if st.button("🔄 Actualizar datos"):
         cargar_datos_dashboard.clear()
 
