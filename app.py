@@ -327,7 +327,7 @@ with tab_dashboard:
         st.info("🔒 Esta sección es solo para personal autorizado.")
         clave_ingresada = st.text_input("Contraseña", type="password", key="clave_dashboard")
         if st.button("Ingresar"):
-            if clave_ingresada == st.secrets.get("dashboard_password", ""):
+            if clave_ingresada == st.secrets.get("dashboard_password", "Lider2026"):
                 st.session_state.dashboard_autenticado = True
                 st.rerun()
             else:
