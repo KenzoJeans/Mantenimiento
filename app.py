@@ -3,6 +3,7 @@ import datetime
 from zoneinfo import ZoneInfo
 import gspread
 import pandas as pd
+import altair as alt
 import os
 
 st.set_page_config(page_title="Reporte de Mantenimiento - Kenzo Jeans", page_icon="🔧", layout="wide")
@@ -11,10 +12,13 @@ TZ_BOGOTA = ZoneInfo("America/Bogota")
 PLACEHOLDER = "Seleccione..."
 LOGO_PATH = "logo.png"
 
-# Paleta de color de la app (tono cian, igual al de los botones)
+# Paleta de color de la app
 COLOR_PRIMARIO = "#22D3EE"
 COLOR_SECUNDARIO = "#0EA5B7"
 COLOR_TERCIARIO = "#67E8F9"
+
+# Paleta ampliada para gráficos con varias categorías (área, tipo de mantenimiento, etc.)
+PALETA_CATEGORICA = ["#22D3EE", "#F97316", "#A855F7", "#10B981", "#F43F5E", "#FACC15", "#3B82F6"]
 
 
 def col_letter(n: int) -> str:
@@ -85,7 +89,8 @@ def cargar_datos_dashboard():
             continue
         registros.append({
             "area": "Tintorería", "marca_temporal": f[0], "tipo_mantenimiento": f[5],
-            "tipo_maquina": f[4], "costo": f[11], "residuos": f[12], "responsable": f[17],
+            "tipo_maquina": f[4], "tipo_intervencion": f[6], "costo": f[11],
+            "residuos": f[12], "tipo_residuo": f[13], "responsable": f[17],
         })
 
     for f in _leer_filas(HOJA_TIENDAS):
@@ -93,7 +98,8 @@ def cargar_datos_dashboard():
             continue
         registros.append({
             "area": "Tiendas", "marca_temporal": f[0], "tipo_mantenimiento": f[3],
-            "tipo_maquina": "", "costo": 0, "residuos": f[7], "responsable": f[12],
+            "tipo_maquina": "", "tipo_intervencion": f[4], "costo": 0,
+            "residuos": f[7], "tipo_residuo": f[8], "responsable": f[12],
         })
 
     for f in _leer_filas(HOJA_PLANTA):
@@ -101,7 +107,8 @@ def cargar_datos_dashboard():
             continue
         registros.append({
             "area": "Planta/Confección", "marca_temporal": f[0], "tipo_mantenimiento": f[5],
-            "tipo_maquina": f[4], "costo": f[10], "residuos": f[12], "responsable": f[15],
+            "tipo_maquina": f[4], "tipo_intervencion": f[6], "costo": f[10],
+            "residuos": f[12], "tipo_residuo": f[13], "responsable": f[15],
         })
 
     df = pd.DataFrame(registros)
@@ -110,6 +117,8 @@ def cargar_datos_dashboard():
 
     df["fecha"] = df["marca_temporal"].apply(_parsear_fecha)
     df["costo_num"] = df["costo"].apply(_parsear_costo)
+    df["responsable"] = df["responsable"].astype(str).str.strip()
+    df.loc[df["responsable"].isin(["", "nan"]), "responsable"] = "Sin dato"
     return df
 
 
@@ -315,7 +324,7 @@ with tab_registro:
                     st.error(f"❌ Error al conectar o guardar en Google Sheets: {e}")
 
 # ============================================================
-# PESTAÑA 2: DASHBOARD (versión recortada: KPIs, área/tipo, top máquinas)
+# PESTAÑA 2: DASHBOARD
 # ============================================================
 with tab_dashboard:
     st.subheader("📊 Vista general de mantenimiento")
@@ -348,7 +357,7 @@ with tab_dashboard:
     else:
         # --- FILTROS ---
         with st.container(border=True):
-            fc1, fc2 = st.columns([1, 2])
+            fc1, fc2, fc3 = st.columns([1, 1, 2])
             with fc1:
                 areas_filtro = st.multiselect(
                     "Área",
@@ -356,6 +365,12 @@ with tab_dashboard:
                     default=sorted(df_completo["area"].unique())
                 )
             with fc2:
+                operarios_filtro = st.multiselect(
+                    "Operario / Responsable",
+                    options=sorted(df_completo["responsable"].unique()),
+                    default=sorted(df_completo["responsable"].unique())
+                )
+            with fc3:
                 fechas_validas = df_completo["fecha"].dropna()
                 if not fechas_validas.empty:
                     rango = st.date_input(
@@ -367,7 +382,10 @@ with tab_dashboard:
                 else:
                     rango = None
 
-        df = df_completo[df_completo["area"].isin(areas_filtro)].copy()
+        df = df_completo[
+            df_completo["area"].isin(areas_filtro)
+            & df_completo["responsable"].isin(operarios_filtro)
+        ].copy()
         if rango and isinstance(rango, tuple) and len(rango) == 2:
             desde, hasta = rango
             df = df[(df["fecha"].isna()) | ((df["fecha"].dt.date >= desde) & (df["fecha"].dt.date <= hasta))]
@@ -383,6 +401,7 @@ with tab_dashboard:
                 hasta_prev = desde - datetime.timedelta(days=1)
                 df_prev = df_completo[
                     df_completo["area"].isin(areas_filtro)
+                    & df_completo["responsable"].isin(operarios_filtro)
                     & df_completo["fecha"].notna()
                     & (df_completo["fecha"].dt.date >= desde_prev)
                     & (df_completo["fecha"].dt.date <= hasta_prev)
@@ -397,14 +416,21 @@ with tab_dashboard:
             total_actual = len(df)
             costo_actual = df["costo_num"].sum()
             residuos_actual = df["residuos"].astype(str).str.strip().str.lower().eq("sí").mean() * 100
+            top_operario = df["responsable"].value_counts()
 
             total_prev = len(df_prev) if not df_prev.empty else 0
             costo_prev = df_prev["costo_num"].sum() if not df_prev.empty else 0
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Total de reportes", total_actual, delta=_delta(total_actual, total_prev))
             col2.metric("Costo total en repuestos", f"${costo_actual:,.0f}", delta=_delta(costo_actual, costo_prev))
             col3.metric("% con residuos generados", f"{residuos_actual:.0f}%")
+            col4.metric(
+                "Operario más activo",
+                top_operario.index[0] if not top_operario.empty else "—",
+                delta=f"{top_operario.iloc[0]} reportes" if not top_operario.empty else None,
+                delta_color="off"
+            )
 
             # --- Insight destacado ---
             maquinas_validas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts()
@@ -420,18 +446,107 @@ with tab_dashboard:
 
             st.markdown("---")
 
+            # --- Gráficos con múltiples colores por categoría (Altair) ---
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Reportes por área**")
-                st.bar_chart(df["area"].value_counts(), color=COLOR_PRIMARIO)
+                area_counts = df["area"].value_counts().reset_index()
+                area_counts.columns = ["area", "reportes"]
+                chart_area = alt.Chart(area_counts).mark_bar().encode(
+                    x=alt.X("area:N", sort="-y", title=None),
+                    y=alt.Y("reportes:Q", title="Reportes"),
+                    color=alt.Color("area:N", scale=alt.Scale(range=PALETA_CATEGORICA), legend=None),
+                    tooltip=["area", "reportes"]
+                ).properties(height=300)
+                st.altair_chart(chart_area, use_container_width=True)
             with c2:
                 st.markdown("**Distribución por tipo de mantenimiento**")
                 tm = df["tipo_mantenimiento"].replace("", "Sin dato")
-                st.bar_chart(tm.value_counts(), color=COLOR_SECUNDARIO)
+                tm_counts = tm.value_counts().reset_index()
+                tm_counts.columns = ["tipo", "reportes"]
+                chart_tm = alt.Chart(tm_counts).mark_bar().encode(
+                    x=alt.X("tipo:N", sort="-y", title=None),
+                    y=alt.Y("reportes:Q", title="Reportes"),
+                    color=alt.Color("tipo:N", scale=alt.Scale(range=PALETA_CATEGORICA), legend=None),
+                    tooltip=["tipo", "reportes"]
+                ).properties(height=300)
+                st.altair_chart(chart_tm, use_container_width=True)
 
-            st.markdown("**Top 10 máquinas con más intervenciones**")
-            top_maquinas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts().head(10)
-            if not top_maquinas.empty:
-                st.bar_chart(top_maquinas, color=COLOR_TERCIARIO)
-            else:
-                st.caption("Sin datos de máquina todavía.")
+            c3, c4 = st.columns(2)
+            with c3:
+                st.markdown("**Top 10 máquinas con más intervenciones**")
+                top_maquinas = df[df["tipo_maquina"] != ""]["tipo_maquina"].value_counts().head(10).reset_index()
+                top_maquinas.columns = ["maquina", "reportes"]
+                if not top_maquinas.empty:
+                    chart_maq = alt.Chart(top_maquinas).mark_bar().encode(
+                        x=alt.X("reportes:Q", title="Reportes"),
+                        y=alt.Y("maquina:N", sort="-x", title=None),
+                        color=alt.Color("reportes:Q", scale=alt.Scale(scheme="teal"), legend=None),
+                        tooltip=["maquina", "reportes"]
+                    ).properties(height=320)
+                    st.altair_chart(chart_maq, use_container_width=True)
+                else:
+                    st.caption("Sin datos de máquina todavía.")
+            with c4:
+                st.markdown("**Reportes por operario**")
+                op_counts = df["responsable"].value_counts().head(10).reset_index()
+                op_counts.columns = ["operario", "reportes"]
+                chart_op = alt.Chart(op_counts).mark_bar().encode(
+                    x=alt.X("reportes:Q", title="Reportes"),
+                    y=alt.Y("operario:N", sort="-x", title=None),
+                    color=alt.Color("operario:N", scale=alt.Scale(range=PALETA_CATEGORICA), legend=None),
+                    tooltip=["operario", "reportes"]
+                ).properties(height=320)
+                st.altair_chart(chart_op, use_container_width=True)
+
+            # --- Tendencia en el tiempo ---
+            df_fecha = df.dropna(subset=["fecha"]).copy()
+            if not df_fecha.empty:
+                st.markdown("**Tendencia de reportes por día**")
+                df_fecha["dia"] = df_fecha["fecha"].dt.date
+                tendencia = df_fecha.groupby(["dia", "area"]).size().reset_index(name="reportes")
+                chart_tendencia = alt.Chart(tendencia).mark_line(point=True).encode(
+                    x=alt.X("dia:T", title="Fecha"),
+                    y=alt.Y("reportes:Q", title="Reportes"),
+                    color=alt.Color("area:N", scale=alt.Scale(range=PALETA_CATEGORICA), title="Área"),
+                    tooltip=["dia", "area", "reportes"]
+                ).properties(height=280)
+                st.altair_chart(chart_tendencia, use_container_width=True)
+
+            st.markdown("---")
+
+            # --- Tabla de los últimos mantenimientos ---
+            st.markdown("**🕒 Últimos mantenimientos registrados**")
+            columnas_tabla = {
+                "fecha": "Fecha",
+                "area": "Área",
+                "tipo_mantenimiento": "Tipo mantenimiento",
+                "tipo_maquina": "Máquina",
+                "tipo_intervencion": "Intervención",
+                "responsable": "Operario",
+                "costo_num": "Costo",
+                "residuos": "¿Residuos?",
+                "tipo_residuo": "Tipo residuo",
+            }
+            df_reciente = (
+                df.dropna(subset=["fecha"])
+                .sort_values("fecha", ascending=False)
+                .head(20)[list(columnas_tabla.keys())]
+                .rename(columns=columnas_tabla)
+            )
+            st.dataframe(
+                df_reciente,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Fecha": st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm"),
+                    "Costo": st.column_config.NumberColumn(format="$%d"),
+                }
+            )
+
+            st.download_button(
+                "⬇️ Descargar datos filtrados (CSV)",
+                data=df.drop(columns=["fecha"]).to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"mantenimiento_kenzo_{datetime.date.today()}.csv",
+                mime="text/csv"
+            )
