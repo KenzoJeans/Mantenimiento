@@ -481,7 +481,7 @@ with tab_dashboard:
                     chart_maq = alt.Chart(top_maquinas).mark_bar().encode(
                         x=alt.X("reportes:Q", title="Reportes"),
                         y=alt.Y("maquina:N", sort="-x", title=None),
-                        color=alt.Color("reportes:Q", scale=alt.Scale(scheme="teal"), legend=None),
+                        color=alt.Color("reportes:Q", scale=alt.Scale(scheme="teals"), legend=None),
                         tooltip=["maquina", "reportes"]
                     ).properties(height=320)
                     st.altair_chart(chart_maq, use_container_width=True)
